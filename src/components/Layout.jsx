@@ -84,7 +84,7 @@ export default function Layout() {
           )}
           {role === 'gérant' && (
             <a
-              href="/Ridr/inscription"
+              href={`${import.meta.env.BASE_URL}inscription`}
               target="_blank"
               rel="noopener noreferrer"
               className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm text-brand-200 hover:bg-brand-600 hover:text-white transition-colors"

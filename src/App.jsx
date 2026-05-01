@@ -16,7 +16,7 @@ import Utilisateurs from './pages/Utilisateurs'
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
       <AuthProvider>
         <SaisonProvider>
           <Routes>
