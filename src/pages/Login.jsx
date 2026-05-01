@@ -27,7 +27,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-brand-700">StableConnect</h1>
+          <h1 className="text-2xl font-bold text-brand-700">Ridr</h1>
           <p className="text-gray-500 text-sm mt-1">Centre équestre — Saison 2026-2027</p>
         </div>
 

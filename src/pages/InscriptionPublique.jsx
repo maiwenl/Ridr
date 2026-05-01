@@ -202,6 +202,20 @@ export default function InscriptionPublique() {
       await supabase.from('responsables').insert(resp)
     }
 
+    // 4. Email de confirmation (best-effort, pas bloquant)
+    if (formData.email) {
+      const coursSel = cours.find(c => c.id === formData.cours_id)
+      supabase.functions.invoke('confirmation-inscription', {
+        body: {
+          nom:    formData.nom.trim().toUpperCase(),
+          prenom: formData.prenom.trim(),
+          email:  formData.email.trim(),
+          cours:  coursSel ? `${coursSel.nom} — ${coursSel.jour} ${coursSel.heure_debut?.slice(0, 5)}` : null,
+          saison: saisonActive?.libelle ?? '',
+        },
+      })
+    }
+
     setSubmitting(false)
     setPhase('succes')
     window.scrollTo(0, 0)

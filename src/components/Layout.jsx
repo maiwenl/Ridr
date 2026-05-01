@@ -32,7 +32,7 @@ export default function Layout() {
       {/* ── Sidebar desktop (md+) ── */}
       <aside className="hidden md:flex w-56 bg-brand-700 text-white flex-col shrink-0">
         <div className="px-4 py-5 border-b border-brand-600 space-y-2">
-          <span className="font-bold text-lg tracking-tight block">StableConnect</span>
+          <span className="font-bold text-lg tracking-tight block">Ridr</span>
 
           {/* Sélecteur de saison */}
           {saisons.length > 0 ? (
@@ -95,7 +95,7 @@ export default function Layout() {
       <main className="flex-1 overflow-auto pb-20 md:pb-0">
         {/* Bandeau saison mobile */}
         <div className="md:hidden bg-brand-700 text-white px-4 py-2 flex items-center justify-between gap-3">
-          <span className="text-xs font-bold tracking-tight">StableConnect</span>
+          <span className="text-xs font-bold tracking-tight">Ridr</span>
           {saisons.length > 0 && (
             <select
               value={saisonCourante?.id ?? ''}
