@@ -82,6 +82,17 @@ export default function Layout() {
               <p className="text-xs text-brand-300 capitalize">{profile.role}</p>
             </div>
           )}
+          {role === 'gérant' && (
+            <a
+              href="/Ridr/inscription"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm text-brand-200 hover:bg-brand-600 hover:text-white transition-colors"
+            >
+              <span>🔗</span>
+              <span>Lien pré-inscription</span>
+            </a>
+          )}
           <button
             onClick={signOut}
             className="w-full text-left px-3 py-2 rounded-md text-sm text-brand-200 hover:bg-brand-600 hover:text-white transition-colors"
