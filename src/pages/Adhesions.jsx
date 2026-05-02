@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useSaison } from '../contexts/SaisonContext'
+import { useAuth } from '../contexts/AuthContext'
 
 const STATUTS = {
   creation:        { label: 'En création',  cls: 'bg-gray-100 text-gray-600' },
@@ -19,6 +20,8 @@ function TrashIcon() {
 
 export default function Adhesions() {
   const { saisonCourante } = useSaison()
+  const { profile } = useAuth()
+  const isGerant = profile?.role === 'gérant'
 
   const [adhesions, setAdhesions]           = useState([])
   const [coursOptions, setCoursOptions]     = useState([])
@@ -69,11 +72,13 @@ export default function Adhesions() {
   useEffect(() => { fetchAll() }, [fetchAll])
 
   async function handleStatutChange(adhesionId, newStatut) {
+    if (!isGerant) return
     setAdhesions(prev => prev.map(a => a.id === adhesionId ? { ...a, statut: newStatut } : a))
     await supabase.from('adhesions').update({ statut: newStatut }).eq('id', adhesionId)
   }
 
   async function handleDelete(adhesion) {
+    if (!isGerant) return
     const nom = `${adhesion.adherent?.prenom} ${adhesion.adherent?.nom}`
     if (!window.confirm(`Supprimer l'inscription de ${nom} pour cette saison ?\n\nLa fiche personnelle de l'adhérent sera conservée.`)) return
     await supabase.from('adhesions').delete().eq('id', adhesion.id)

@@ -279,7 +279,7 @@ export default function Cours() {
 
                           {/* Moniteur */}
                           <td className={td + ' text-gray-500'}>
-                            {c.moniteur ? `${c.moniteur.prenom} ${c.moniteur.nom}` : <span className="text-gray-300">—</span>}
+                            {c.moniteur ? `${c.moniteur.prenom}` : <span className="text-gray-300">—</span>}
                           </td>
 
                           {/* Places */}
@@ -491,7 +491,7 @@ export default function Cours() {
                     >
                       <option value="">— Aucun —</option>
                       {moniteurs.map(m => (
-                        <option key={m.id} value={m.id}>{m.prenom} {m.nom}</option>
+                        <option key={m.id} value={m.id}>{m.prenom}</option>
                       ))}
                     </select>
                   </div>

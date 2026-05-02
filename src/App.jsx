@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { SaisonProvider } from './contexts/SaisonContext'
-import ProtectedRoute from './components/ProtectedRoute'
+import ProtectedRoute, { RequireRole } from './components/ProtectedRoute'
 import Layout from './components/Layout'
 
 import Login from './pages/Login'
@@ -24,14 +24,20 @@ export default function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/inscription" element={<InscriptionPublique />} />
 
-            {/* Pages protégées */}
+            {/* Pages protégées — tous les rôles connectés */}
             <Route element={<ProtectedRoute />}>
               <Route element={<Layout />}>
                 <Route path="/adhesions" element={<Adhesions />} />
-                <Route path="/adhesions/nouveau" element={<NouvelAdherent />} />
                 <Route path="/adhesions/:id" element={<FicheAdherent />} />
                 <Route path="/cours" element={<Cours />} />
                 <Route path="/pointage" element={<Pointage />} />
+              </Route>
+            </Route>
+
+            {/* Pages réservées gérant uniquement */}
+            <Route element={<RequireRole roles={['gérant']} />}>
+              <Route element={<Layout />}>
+                <Route path="/adhesions/nouveau" element={<NouvelAdherent />} />
                 <Route path="/utilisateurs" element={<Utilisateurs />} />
                 <Route path="/parametres" element={<Parametres />} />
               </Route>

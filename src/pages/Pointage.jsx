@@ -89,10 +89,12 @@ export default function Pointage() {
         .in('cours_id', coursIds)
         .eq('date', dateStr),
       (() => {
+        // Les moniteurs ne voient que les adhérents de leurs propres cours
         let q = supabase
           .from('adhesions')
           .select('adherent_id, cours_id, adherent:adherent_id(id, nom, prenom), forfait:forfait_id(libelle, nb_seances)')
         if (saisonCourante?.id) q = q.eq('saison_id', saisonCourante.id)
+        if (isMoniteur) q = q.in('cours_id', coursIds)
         return q
       })(),
     ])
