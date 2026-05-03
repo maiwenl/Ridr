@@ -89,7 +89,7 @@ export default function Step4Recap({ formData, forfaits, cours, parametres, onSu
           {forfait2 && <Row label={forfait2.libelle} value={`${prixForfait2} €`} />}
           {remiseAppliquee > 0 && <Row label="Remise" value={`−${remiseAppliquee} €`} green />}
           <Row
-            label={`Licence FFE (${age !== null && age < 18 ? '< 18 ans' : '≥ 18 ans'})`}
+            label={`Licence FFE (${age !== null && age < 18 ? '≤ 18 ans' : '> 18 ans'})`}
             value={`${licenceMontant} €`}
           />
           <div className="border-t pt-2 mt-1">

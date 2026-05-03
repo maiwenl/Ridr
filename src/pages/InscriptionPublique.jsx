@@ -224,22 +224,36 @@ export default function InscriptionPublique() {
   // ── Écran accueil ─────────────────────────────────────────────────────────
   if (phase === 'accueil') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-brand-700 to-brand-900 flex items-center justify-center p-6">
-        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg p-8 md:p-12 text-center">
-          <div className="text-5xl mb-5">🐴</div>
-          <h1 className="text-3xl md:text-4xl font-black text-gray-900 mb-2">Pré-inscription</h1>
-          <p className="text-brand-700 font-semibold mb-1">Saison {saisonActive?.libelle ?? '…'}</p>
-          <p className="text-gray-500 text-sm md:text-base mb-10 mt-3 leading-relaxed">
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6 relative overflow-hidden">
+        {/* Grille de fond */}
+        <div className="absolute inset-0 opacity-[0.04]"
+          style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize: '32px 32px' }} />
+        {/* Halo violet */}
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-brand-600/20 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg p-8 md:p-12 text-center">
+          {/* Badge saison */}
+          {saisonActive && (
+            <div className="inline-flex items-center gap-1.5 bg-brand-50 text-brand-700 border border-brand-100 text-xs font-semibold px-3 py-1.5 rounded-full mb-6">
+              <div className="w-1.5 h-1.5 rounded-full bg-brand-500" />
+              Saison {saisonActive.libelle}
+            </div>
+          )}
+          <h1 className="text-3xl md:text-4xl font-black text-gray-900 mb-3 leading-tight">
+            Pré-inscription<br />
+            <span className="text-brand-600">au club</span>
+          </h1>
+          <p className="text-gray-500 text-sm md:text-base mb-10 leading-relaxed">
             Remplissez ce formulaire pour pré-inscrire votre enfant ou vous-même.
             Notre équipe vous contactera pour finaliser l'inscription.
           </p>
           <button
             onClick={() => { setPhase('form'); setStep(1) }}
-            className="w-full bg-brand-600 hover:bg-brand-700 active:scale-95 text-white text-lg md:text-xl font-bold py-4 rounded-2xl shadow-lg transition-all"
+            className="w-full bg-brand-600 hover:bg-brand-700 active:scale-[0.98] text-white text-base font-bold py-4 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-200"
           >
-            Commencer →
+            Commencer mon inscription →
           </button>
-          <p className="text-xs text-gray-400 mt-6">
+          <p className="text-xs text-gray-500 mt-5">
             Déjà inscrit ? Contactez-nous directement.
           </p>
         </div>
@@ -250,23 +264,31 @@ export default function InscriptionPublique() {
   // ── Écran succès ──────────────────────────────────────────────────────────
   if (phase === 'succes') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-600 to-brand-700 flex items-center justify-center p-6">
-        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg p-8 md:p-12 text-center">
-          <div className="text-6xl mb-5">✅</div>
-          <h1 className="text-3xl font-black text-gray-900 mb-3">Merci !</h1>
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6 relative overflow-hidden">
+        <div className="absolute inset-0 opacity-[0.04]"
+          style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize: '32px 32px' }} />
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-emerald-500/15 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg p-8 md:p-12 text-center">
+          <div className="w-16 h-16 rounded-full bg-emerald-50 border-2 border-emerald-200 flex items-center justify-center mx-auto mb-6">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-emerald-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            </svg>
+          </div>
+          <h1 className="text-3xl font-black text-gray-900 mb-3">Parfait !</h1>
           <p className="text-gray-600 text-base leading-relaxed mb-2">
             Votre pré-inscription a bien été enregistrée.
           </p>
-          <p className="text-gray-400 text-sm mb-10">
+          <p className="text-gray-500 text-sm mb-10">
             Notre équipe vous contactera prochainement pour confirmer et finaliser votre dossier.
           </p>
           <button
             onClick={handleReset}
-            className="w-full bg-brand-600 hover:bg-brand-700 active:scale-95 text-white text-lg font-bold py-4 rounded-2xl shadow-lg transition-all mb-4"
+            className="w-full bg-brand-600 hover:bg-brand-700 active:scale-[0.98] text-white text-base font-bold py-4 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-200 mb-4"
           >
             Nouvelle pré-inscription
           </button>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-gray-500">
             Retour automatique dans {countdown} secondes…
           </p>
         </div>
@@ -286,58 +308,49 @@ export default function InscriptionPublique() {
     <div className="min-h-screen bg-gray-50">
 
       {/* Header */}
-      <div className="bg-brand-700 text-white px-4 py-4 md:px-8 md:py-5">
-        <div className="max-w-2xl mx-auto flex items-center justify-between">
-          <div>
-            <p className="text-brand-300 text-xs font-medium">Pré-inscription {saisonActive?.libelle ?? '…'}</p>
-            <h1 className="text-lg md:text-xl font-bold leading-tight">
-              {STEP_META[step]?.label}
-            </h1>
-          </div>
-          {/* Stepper pills */}
-          <div className="flex items-center gap-2">
-            {visibleSteps.map((s, i) => (
-              <div key={s} className={`flex items-center justify-center rounded-full text-xs font-bold transition-all ${
-                i < currentIdx
-                  ? 'w-7 h-7 bg-brand-400 text-white'
-                  : i === currentIdx
-                  ? 'w-8 h-8 bg-white text-brand-700'
-                  : 'w-7 h-7 bg-brand-600 text-brand-300'
-              }`}>
-                {i < currentIdx ? '✓' : i + 1}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Stepper desktop — libellés */}
-      <div className="hidden md:block bg-white border-b border-gray-100 px-8">
+      <div className="bg-slate-900 text-white px-4 py-4 md:px-8 md:py-5 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto">
-          <div className="flex items-center py-4 gap-2">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="text-slate-400 text-[11px] font-semibold uppercase tracking-wider">Pré-inscription · {saisonActive?.libelle ?? '…'}</p>
+              <h1 className="text-lg font-bold leading-tight mt-0.5">
+                {STEP_META[step]?.label}
+              </h1>
+            </div>
+            <div className="text-xs text-slate-400 font-medium">
+              {currentIdx + 1} / {visibleSteps.length}
+            </div>
+          </div>
+          {/* Barre de progression */}
+          <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-brand-500 rounded-full transition-all duration-500"
+              style={{ width: `${((currentIdx + 1) / visibleSteps.length) * 100}%` }}
+            />
+          </div>
+          {/* Étapes desktop */}
+          <div className="hidden md:flex items-center gap-4 mt-3">
             {visibleSteps.map((s, i) => {
               const isDone    = i < currentIdx
               const isCurrent = s === step
               return (
-                <div key={s} className="flex items-center gap-2">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                      isDone    ? 'bg-brand-500 text-white' :
-                      isCurrent ? 'bg-brand-600 text-white' :
-                                  'bg-gray-200 text-gray-500'
-                    }`}>
-                      {isDone ? '✓' : i + 1}
-                    </div>
-                    <span className={`text-sm whitespace-nowrap ${
-                      isCurrent ? 'font-semibold text-brand-700' :
-                      isDone    ? 'text-brand-500' :
-                                  'text-gray-400'
-                    }`}>
-                      {STEP_META[s]?.label}
-                    </span>
+                <div key={s} className="flex items-center gap-1.5">
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 transition-all ${
+                    isDone    ? 'bg-brand-500 text-white' :
+                    isCurrent ? 'bg-white text-slate-900' :
+                                'bg-white/15 text-slate-500'
+                  }`}>
+                    {isDone ? '✓' : i + 1}
                   </div>
+                  <span className={`text-xs whitespace-nowrap transition-colors ${
+                    isCurrent ? 'text-white font-semibold' :
+                    isDone    ? 'text-brand-400' :
+                                'text-slate-500'
+                  }`}>
+                    {STEP_META[s]?.label}
+                  </span>
                   {i < visibleSteps.length - 1 && (
-                    <span className="text-gray-300 text-lg mx-1">›</span>
+                    <span className="text-slate-700 text-xs ml-2">›</span>
                   )}
                 </div>
               )
@@ -376,7 +389,7 @@ export default function InscriptionPublique() {
               {/* Cours */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cours souhaité <span className="font-normal text-gray-400">(optionnel)</span>
+                  Cours souhaité <span className="font-normal text-gray-500">(optionnel)</span>
                 </label>
                 {formData.galop && coursFiltres.length < cours.length && (
                   <p className="text-xs text-brand-600 mb-3">
@@ -385,7 +398,7 @@ export default function InscriptionPublique() {
                   </p>
                 )}
                 {coursFiltres.length === 0 && cours.length > 0 ? (
-                  <p className="text-sm text-gray-400 italic py-2">
+                  <p className="text-sm text-gray-500 italic py-2">
                     Aucun cours disponible pour ce niveau — notre équipe vous guidera.
                   </p>
                 ) : (
@@ -412,13 +425,13 @@ export default function InscriptionPublique() {
               {/* Forfait */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Forfait <span className="font-normal text-gray-400">(optionnel)</span>
+                  Forfait <span className="font-normal text-gray-500">(optionnel)</span>
                 </label>
                 {age === null && (
-                  <p className="text-xs text-gray-400 italic mb-3">Renseignez la date de naissance à l'étape 1 pour voir les forfaits disponibles.</p>
+                  <p className="text-xs text-gray-500 italic mb-3">Renseignez la date de naissance à l'étape 1 pour voir les forfaits disponibles.</p>
                 )}
                 {age !== null && forfaitsFiltres.length === 0 ? (
-                  <p className="text-sm text-gray-400 italic py-2">
+                  <p className="text-sm text-gray-500 italic py-2">
                     Aucun forfait disponible pour cet âge — notre équipe vous guidera.
                   </p>
                 ) : (
@@ -519,31 +532,48 @@ export default function InscriptionPublique() {
             <button
               type="button"
               onClick={goPrev}
-              className="text-sm text-gray-500 hover:text-gray-700 font-medium px-4 py-2.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+              className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 font-medium px-4 py-2.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 transition-all duration-150 shadow-card"
             >
-              ← Précédent
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+              </svg>
+              Précédent
             </button>
-
-            <span className="text-xs text-gray-400 hidden sm:block">
-              Étape {currentIdx + 1} sur {visibleSteps.length}
-            </span>
 
             <button
               type="button"
               onClick={goNext}
               disabled={submitting}
-              className="bg-brand-600 hover:bg-brand-700 disabled:opacity-60 active:scale-95 text-white text-sm font-semibold px-6 py-2.5 rounded-lg transition-all"
+              className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 disabled:opacity-60 active:scale-[0.98] text-white text-sm font-bold px-6 py-2.5 rounded-xl shadow-sm hover:shadow-md transition-all duration-150"
             >
-              {submitting
-                ? 'Envoi en cours…'
-                : isLastStep
-                ? 'Envoyer mon dossier ✓'
-                : 'Suivant →'}
+              {submitting ? (
+                <>
+                  <svg className="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                  </svg>
+                  Envoi en cours…
+                </>
+              ) : isLastStep ? (
+                <>
+                  Envoyer mon dossier
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                  </svg>
+                </>
+              ) : (
+                <>
+                  Suivant
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                  </svg>
+                </>
+              )}
             </button>
           </div>
         </div>
 
-        <p className="text-center text-xs text-gray-400 mt-6">
+        <p className="text-center text-xs text-gray-500 mt-6">
           Vos données sont utilisées uniquement pour la gestion de votre inscription.
         </p>
       </div>

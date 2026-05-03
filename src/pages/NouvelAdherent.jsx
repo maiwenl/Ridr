@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import LoadingSpinner from '../components/LoadingSpinner'
 import { useForfaits } from '../hooks/useForfaits'
 import { useCours } from '../hooks/useCours'
 import { useParametres } from '../hooks/useParametres'
@@ -152,19 +153,13 @@ export default function NouvelAdherent() {
     navigate('/adhesions')
   }
 
-  if (loadingF || loadingC || loadingP) {
-    return (
-      <div className="p-8 flex items-center justify-center min-h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600" />
-      </div>
-    )
-  }
+  if (loadingF || loadingC || loadingP) return <LoadingSpinner />
 
   return (
     <div className="p-8 max-w-4xl">
       <h1 className="text-2xl font-bold text-gray-900 mb-1">Nouvelle inscription</h1>
       {saisonCourante && (
-        <p className="text-sm text-gray-400 mb-6">Saison {saisonCourante.libelle}</p>
+        <p className="text-sm text-gray-500 mb-6">Saison {saisonCourante.libelle}</p>
       )}
 
       {/* Stepper */}
@@ -186,13 +181,13 @@ export default function NouvelAdherent() {
                 <span className={`text-sm whitespace-nowrap ${
                   isCurrent ? 'font-medium text-brand-700' :
                   isDone    ? 'text-brand-500' :
-                              'text-gray-400'
+                              'text-gray-500'
                 }`}>
                   {label}
                 </span>
               </div>
               {i < visibleSteps.length - 1 && (
-                <span className="text-gray-300 mx-2 text-lg">›</span>
+                <span className="text-gray-400 mx-2 text-lg">›</span>
               )}
             </div>
           )

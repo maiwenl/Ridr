@@ -3,8 +3,7 @@ import {
   calculateAge, filterForfaitsByAge, MODES_PAIEMENT,
 } from '../../lib/calculs'
 
-const inputCls = err =>
-  `w-full rounded-lg border ${err ? 'border-red-400' : 'border-gray-300'} px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent`
+import { inputCls } from '../../lib/ui'
 
 export default function Step3ForFait({ data, onChange, errors, cours, forfaits, parametres, dateNaissance, modesReglement = [] }) {
   const [showForfait2, setShowForfait2] = useState(!!data.forfait2_id)
@@ -55,7 +54,7 @@ export default function Step3ForFait({ data, onChange, errors, cours, forfaits, 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Forfait principal *</label>
         {forfaitsFiltres.length === 0 ? (
-          <p className="text-sm text-gray-400 italic py-2">
+          <p className="text-sm text-gray-500 italic py-2">
             {age === null
               ? "Renseignez la date de naissance à l'étape 1"
               : 'Aucun forfait disponible pour cet âge'}
@@ -84,7 +83,7 @@ export default function Step3ForFait({ data, onChange, errors, cours, forfaits, 
           onClick={() => setShowForfait2(true)}
           className="text-sm text-brand-600 hover:text-brand-800 font-medium"
         >
-          + Ajouter un 2ème forfait <span className="text-gray-400 font-normal">(remise -50 € auto)</span>
+          + Ajouter un 2ème forfait <span className="text-gray-500 font-normal">(remise -50 € auto)</span>
         </button>
       ) : (
         <div>
@@ -123,7 +122,7 @@ export default function Step3ForFait({ data, onChange, errors, cours, forfaits, 
             className="rounded border-gray-300 text-brand-600 focus:ring-brand-500"
           />
           <span className="text-sm text-gray-700">
-            Bénéficie de la remise famille <span className="text-gray-400">(-50 €)</span>
+            Bénéficie de la remise famille <span className="text-gray-500">(-50 €)</span>
           </span>
         </label>
         {data.remise_famille && (

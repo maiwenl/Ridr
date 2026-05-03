@@ -1,29 +1,30 @@
-import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useParametres } from '../hooks/useParametres'
+import { useSaison } from '../contexts/SaisonContext'
 import {
   calculateAge, computeFinancial, computeEcheancier,
   formatMontant, formatModePaiement,
 } from '../lib/calculs'
-
-const STATUTS = {
-  creation:        { label: 'En création', cls: 'bg-gray-100 text-gray-600' },
-  pre_inscription: { label: 'Pré-inscrit', cls: 'bg-amber-100 text-amber-700' },
-  complete:        { label: 'Inscrit',      cls: 'bg-green-100 text-green-700' },
-}
+import { STATUTS } from '../lib/constants'
+import LoadingSpinner from '../components/LoadingSpinner'
 
 export default function FicheAdherent() {
   const { id } = useParams() // id = adhesion.id
   const { parametres } = useParametres()
+  const { saisonCourante } = useSaison()
+  const navigate = useNavigate()
 
-  const [adhesion, setAdhesion]           = useState(null)
+  const [adhesion, setAdhesion]               = useState(null)
   const [autresAdhesions, setAutresAdhesions] = useState([])
-  const [responsables, setResponsables]   = useState([])
-  const [pointages, setPointages]         = useState([])
-  const [coursInscrits, setCoursInscrits] = useState(0)
-  const [loading, setLoading]             = useState(true)
-  const [notFound, setNotFound]           = useState(false)
+  const [responsables, setResponsables]       = useState([])
+  const [pointages, setPointages]             = useState([])
+  const [loading, setLoading]                 = useState(true)
+  const [notFound, setNotFound]               = useState(false)
+
+  // Détecte un vrai changement de saison (pas le rendu initial)
+  const prevSaisonId = useRef(undefined)
 
   useEffect(() => {
     async function fetchAll() {
@@ -46,43 +47,34 @@ export default function FicheAdherent() {
 
       const adherentId = data.adherent_id
 
-      // Toutes les autres adhésions de cet adhérent (historique)
-      const { data: autresData } = await supabase
-        .from('adhesions')
-        .select('id, statut, saison:saison_id(libelle), cours:cours_id(nom), forfait:forfait_id(libelle)')
-        .eq('adherent_id', adherentId)
-        .neq('id', id)
-        .order('created_at', { ascending: false })
+      // Requêtes parallèles — toutes dépendent uniquement de adherentId / data
+      const [
+        { data: autresData },
+        { data: respData },
+        { data: pointagesData },
+      ] = await Promise.all([
+        supabase
+          .from('adhesions')
+          .select('id, statut, saison:saison_id(id, libelle), cours:cours_id(nom), forfait:forfait_id(libelle)')
+          .eq('adherent_id', adherentId)
+          .neq('id', id)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('responsables')
+          .select('*')
+          .eq('adherent_id', adherentId)
+          .order('rang'),
+        (() => {
+          // Filtre par cours si l'adhésion en a un (conso exacte par cours)
+          let q = supabase.from('pointages').select('id, date').eq('adherent_id', adherentId)
+          if (data.cours_id) q = q.eq('cours_id', data.cours_id)
+          return q.order('date', { ascending: false })
+        })(),
+      ])
 
       setAutresAdhesions(autresData ?? [])
-
-      // Responsables légaux
-      const { data: respData } = await supabase
-        .from('responsables')
-        .select('*')
-        .eq('adherent_id', adherentId)
-        .order('rang')
-
       setResponsables(respData ?? [])
-
-      // Pointages de cet adhérent (toutes saisons)
-      const { data: pointagesData } = await supabase
-        .from('pointages')
-        .select('id, date')
-        .eq('adherent_id', adherentId)
-        .order('date', { ascending: false })
-
       setPointages(pointagesData ?? [])
-
-      // Nombre d'inscrits dans le même cours (pour cette adhesion)
-      if (data.cours_id) {
-        const { count } = await supabase
-          .from('adhesions')
-          .select('*', { count: 'exact', head: true })
-          .eq('cours_id', data.cours_id)
-          .eq('saison_id', data.saison_id)
-        setCoursInscrits(count ?? 0)
-      }
 
       setLoading(false)
     }
@@ -90,18 +82,28 @@ export default function FicheAdherent() {
     fetchAll()
   }, [id])
 
+  // Quand l'utilisateur change la saison dans le menu, naviguer vers
+  // l'adhésion de ce même élève pour la nouvelle saison (si elle existe)
+  useEffect(() => {
+    const prev = prevSaisonId.current
+    prevSaisonId.current = saisonCourante?.id
+    // Premier rendu : on enregistre juste la saison initiale, pas de redirect
+    if (prev === undefined) return
+    // La saison n'a pas changé (re-render pour une autre raison)
+    if (prev === saisonCourante?.id) return
+    // La fiche affichée est déjà celle de la bonne saison
+    if (!adhesion || adhesion.saison_id === saisonCourante?.id) return
+    // Cherche l'adhésion de cet élève pour la nouvelle saison
+    const match = autresAdhesions.find(a => a.saison?.id === saisonCourante?.id)
+    if (match) navigate(`/adhesions/${match.id}`, { replace: true })
+  }, [saisonCourante?.id, adhesion, autresAdhesions, navigate])
+
   async function handleStatutChange(newStatut) {
     setAdhesion(prev => ({ ...prev, statut: newStatut }))
     await supabase.from('adhesions').update({ statut: newStatut }).eq('id', id)
   }
 
-  if (loading) {
-    return (
-      <div className="p-8 flex justify-center items-center min-h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600" />
-      </div>
-    )
-  }
+  if (loading) return <LoadingSpinner />
 
   if (notFound) {
     return (
@@ -126,41 +128,43 @@ export default function FicheAdherent() {
   })
   const echeancier = computeEcheancier(total, adhesion.mode_paiement)
 
-  const seancesConso    = pointages.length
-  const seancesTotal    = forfait1?.nb_seances ?? null
-  const pct             = seancesTotal ? Math.min(100, (seancesConso / seancesTotal) * 100) : null
-  const placesRestantes = cours ? cours.capacite - coursInscrits : null
+  const seancesConso = pointages.length
+  const seancesTotal = forfait1?.nb_seances ?? null
+  const pct          = seancesTotal ? Math.min(100, (seancesConso / seancesTotal) * 100) : null
 
   const statut = STATUTS[adhesion.statut] ?? STATUTS.creation
 
   return (
-    <div className="p-8 max-w-5xl">
+    <div className="p-6 md:p-8 max-w-5xl">
 
       {/* Header */}
-      <div className="flex items-start justify-between mb-8">
+      <div className="flex items-start justify-between mb-7 gap-4">
         <div>
-          <Link to="/adhesions" className="text-sm text-gray-400 hover:text-gray-600 mb-1 inline-block">
-            ← Retour à la liste
+          <Link to="/adhesions" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 mb-2 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+            </svg>
+            Retour
           </Link>
           <h1 className="text-2xl font-bold text-gray-900">
-            {adherent.prenom} {adherent.nom}
+            {adherent.prenom} <span className="uppercase">{adherent.nom}</span>
           </h1>
-          <div className="flex items-center gap-2 mt-1 flex-wrap">
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
             {adhesion.saison && (
-              <span className="text-xs bg-brand-50 text-brand-700 border border-brand-100 px-2 py-0.5 rounded-full font-medium">
+              <span className="text-xs bg-brand-50 text-brand-700 border border-brand-100 px-2.5 py-1 rounded-full font-semibold">
                 Saison {adhesion.saison.libelle}
               </span>
             )}
-            <p className="text-sm text-gray-400">
+            <span className="text-xs text-gray-500">
               Inscrit le {new Date(adhesion.created_at).toLocaleDateString('fr-FR')}
-            </p>
+            </span>
           </div>
         </div>
-        <div className="flex items-center gap-3 mt-1">
+        <div className="flex items-center gap-3 mt-1 shrink-0">
           <select
             value={adhesion.statut ?? 'creation'}
             onChange={e => handleStatutChange(e.target.value)}
-            className={`text-sm font-medium px-3 py-1.5 rounded-full border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500 ${statut.cls}`}
+            className={`text-xs font-semibold px-3 py-1.5 rounded-full border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500 ${statut.cls}`}
           >
             {Object.entries(STATUTS).map(([v, { label }]) => (
               <option key={v} value={v}>{label}</option>
@@ -169,10 +173,10 @@ export default function FicheAdherent() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
         {/* ── Colonne principale ── */}
-        <div className="col-span-2 space-y-5">
+        <div className="lg:col-span-2 space-y-5">
 
           {/* Cavalier */}
           <Section title="Informations cavalier">
@@ -194,7 +198,7 @@ export default function FicheAdherent() {
             <Section title="Responsables légaux">
               {responsables.map((r, i) => (
                 <div key={r.id} className={i > 0 ? 'mt-5 pt-5 border-t border-gray-100' : ''}>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
+                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">
                     Responsable {r.rang}
                   </p>
                   <Grid>
@@ -228,22 +232,30 @@ export default function FicheAdherent() {
                     </div>
                   )}
                 </div>
-                {placesRestantes !== null && (
-                  <div className="shrink-0 text-right min-w-[140px]">
-                    <p className="text-xs text-gray-500 mb-1.5">
-                      {coursInscrits} / {cours.capacite} inscrits
-                    </p>
-                    <div className="w-full bg-gray-200 rounded-full h-1.5">
-                      <div
-                        className={`h-1.5 rounded-full ${placesRestantes === 0 ? 'bg-red-500' : 'bg-brand-500'}`}
-                        style={{ width: `${Math.min(100, (coursInscrits / cours.capacite) * 100)}%` }}
-                      />
-                    </div>
-                    <p className={`text-xs mt-1 ${placesRestantes === 0 ? 'text-red-600 font-medium' : 'text-gray-400'}`}>
-                      {placesRestantes === 0 ? 'Complet' : `${placesRestantes} place${placesRestantes > 1 ? 's' : ''} restante${placesRestantes > 1 ? 's' : ''}`}
-                    </p>
-                  </div>
-                )}
+                <div className="shrink-0 text-right min-w-[120px]">
+                  {seancesTotal === null ? (
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-brand-700 bg-brand-50 border border-brand-100 px-2.5 py-1 rounded-full">
+                      Annuel · illimité
+                    </span>
+                  ) : (
+                    <>
+                      <p className={`text-sm font-bold mb-1.5 ${pct >= 100 ? 'text-red-600' : pct >= 75 ? 'text-amber-600' : 'text-brand-700'}`}>
+                        {seancesConso} <span className="font-normal text-gray-400">/</span> {seancesTotal} séances
+                      </p>
+                      <div className="w-full bg-gray-200 rounded-full h-1.5">
+                        <div
+                          className={`h-1.5 rounded-full transition-all ${pct >= 100 ? 'bg-red-500' : pct >= 75 ? 'bg-amber-400' : 'bg-brand-500'}`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <p className={`text-xs mt-1 ${pct >= 100 ? 'text-red-500' : 'text-gray-400'}`}>
+                        {seancesTotal - seancesConso > 0
+                          ? `${seancesTotal - seancesConso} restante${seancesTotal - seancesConso > 1 ? 's' : ''}`
+                          : 'Forfait épuisé'}
+                      </p>
+                    </>
+                  )}
+                </div>
               </div>
             </Section>
           )}
@@ -270,7 +282,7 @@ export default function FicheAdherent() {
                 </div>
                 {pointages.length > 0 ? (
                   <>
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">
                       Dernières séances pointées
                     </p>
                     <div className="space-y-1.5">
@@ -285,14 +297,14 @@ export default function FicheAdherent() {
                         </div>
                       ))}
                       {pointages.length > 8 && (
-                        <p className="text-xs text-gray-400 pl-5 pt-1">
+                        <p className="text-xs text-gray-500 pl-5 pt-1">
                           + {pointages.length - 8} séances antérieures
                         </p>
                       )}
                     </div>
                   </>
                 ) : (
-                  <p className="text-xs text-gray-400">Aucune séance pointée pour l'instant.</p>
+                  <p className="text-xs text-gray-500">Aucune séance pointée pour l'instant.</p>
                 )}
               </>
             )}
@@ -313,17 +325,17 @@ export default function FicheAdherent() {
                         Saison {a.saison?.libelle ?? '—'}
                       </span>
                       {a.cours?.nom && (
-                        <span className="text-xs text-gray-400 ml-2">· {a.cours.nom}</span>
+                        <span className="text-xs text-gray-500 ml-2">· {a.cours.nom}</span>
                       )}
                       {a.forfait?.libelle && (
-                        <span className="text-xs text-gray-400 ml-2">· {a.forfait.libelle}</span>
+                        <span className="text-xs text-gray-500 ml-2">· {a.forfait.libelle}</span>
                       )}
                     </div>
                     <div className="flex items-center gap-2">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUTS[a.statut]?.cls ?? ''}`}>
                         {STATUTS[a.statut]?.label ?? a.statut}
                       </span>
-                      <span className="text-gray-300 group-hover:text-brand-500 text-xs transition-colors">→</span>
+                      <span className="text-gray-400 group-hover:text-brand-500 text-xs transition-colors">→</span>
                     </div>
                   </Link>
                 ))}
@@ -342,7 +354,7 @@ export default function FicheAdherent() {
                 <Row label="Remise" value={`−${remiseAppliquee} €`} green />
               )}
               <Row
-                label={`Licence FFE ${age < 18 ? '(< 18 ans)' : '(≥ 18 ans)'}`}
+                label={`Licence FFE ${age < 18 ? '(≤ 18 ans)' : '(> 18 ans)'}`}
                 value={`${licenceMontant} €`}
               />
               <div className="border-t pt-2 mt-1">
@@ -354,7 +366,7 @@ export default function FicheAdherent() {
               </div>
               {adhesion.remise_famille && (
                 <div className="border-t pt-2">
-                  <p className="text-xs text-gray-400 mb-0.5">Remise famille</p>
+                  <p className="text-xs text-gray-500 mb-0.5">Remise famille</p>
                   <p className="text-gray-700">{adhesion.remise_famille_nom || '—'}</p>
                 </div>
               )}
@@ -381,31 +393,31 @@ export default function FicheAdherent() {
 
 function Section({ title, children }) {
   return (
-    <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-5">
-      <h2 className="text-sm font-semibold text-gray-700 mb-4">{title}</h2>
+    <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-5">
+      <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 pb-3 border-b border-gray-100">{title}</h2>
       {children}
     </div>
   )
 }
 
 function Grid({ children }) {
-  return <div className="grid grid-cols-2 gap-x-6 gap-y-3">{children}</div>
+  return <div className="grid grid-cols-2 gap-x-6 gap-y-4">{children}</div>
 }
 
 function Info({ label, value, full }) {
   return (
     <div className={full ? 'col-span-2' : ''}>
-      <p className="text-xs text-gray-400 mb-0.5">{label}</p>
-      <p className="text-sm text-gray-900">{value || '—'}</p>
+      <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1">{label}</p>
+      <p className="text-sm font-medium text-gray-900">{value || <span className="text-gray-500 font-normal">—</span>}</p>
     </div>
   )
 }
 
 function Row({ label, value, bold, green }) {
   return (
-    <div className={`flex justify-between gap-2 ${green ? 'text-green-600' : ''}`}>
-      <span className={bold ? 'font-semibold text-gray-900' : 'text-gray-500'}>{label}</span>
-      <span className={`text-right ${bold ? 'font-bold text-gray-900' : 'text-gray-800'}`}>{value}</span>
+    <div className={`flex justify-between gap-2 ${green ? 'text-emerald-700' : ''}`}>
+      <span className={bold ? 'font-semibold text-gray-900' : 'text-gray-600 text-sm'}>{label}</span>
+      <span className={`text-right ${bold ? 'font-bold text-gray-900' : 'text-sm font-medium text-gray-800'}`}>{value}</span>
     </div>
   )
 }

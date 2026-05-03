@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { useSaison } from '../contexts/SaisonContext'
+import LoadingSpinner from '../components/LoadingSpinner'
 
 // ── Utilitaires semaines ISO ──────────────────────────────────────────────────
 
@@ -265,13 +266,7 @@ export default function Parametres() {
     setForfaits(prev => prev.filter(x => x.id !== f.id))
   }
 
-  if (loading) {
-    return (
-      <div className="p-8 flex justify-center items-center min-h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600" />
-      </div>
-    )
-  }
+  if (loading) return <LoadingSpinner />
 
   async function handleCreerSaison() {
     setSaisonError('')
@@ -309,7 +304,7 @@ export default function Parametres() {
       <Section title="Saisons">
         <div className="space-y-2 mb-5">
           {saisons.length === 0 && (
-            <p className="text-sm text-gray-400 italic">Aucune saison créée.</p>
+            <p className="text-sm text-gray-500 italic">Aucune saison créée.</p>
           )}
           {saisons.map(s => (
             <div key={s.id} className="flex items-center justify-between px-4 py-3 rounded-xl border border-gray-100 bg-gray-50 gap-3">
@@ -350,7 +345,7 @@ export default function Parametres() {
           </Field>
           <div className="pb-0.5">
             {newAnnee && !isNaN(parseInt(newAnnee)) && (
-              <p className="text-xs text-gray-400 mb-1.5">
+              <p className="text-xs text-gray-500 mb-1.5">
                 Créera la saison <strong>{newAnnee}-{parseInt(newAnnee) + 1}</strong>
               </p>
             )}
@@ -366,7 +361,7 @@ export default function Parametres() {
         {saisonError && (
           <p className="text-sm text-red-500 mt-2">{saisonError}</p>
         )}
-        <p className="text-xs text-gray-400 mt-3">
+        <p className="text-xs text-gray-500 mt-3">
           La saison <strong>active</strong> est celle utilisée pour le formulaire de pré-inscription public.
           Les cours et adhérents créés sont toujours liés à la saison sélectionnée dans la barre latérale.
         </p>
@@ -386,14 +381,14 @@ export default function Parametres() {
           {weeks.length > 0 && (
             <div className="pb-0.5 text-sm text-gray-500">
               <span className="font-semibold text-brand-700">{nbActives}</span> semaines actives
-              <span className="text-gray-300 mx-2">·</span>
+              <span className="text-gray-400 mx-2">·</span>
               {weeks.length} au total
             </div>
           )}
         </div>
 
         {weeks.length === 0 ? (
-          <div className="bg-gray-50 rounded-xl border border-dashed border-gray-200 p-8 text-center text-sm text-gray-400">
+          <div className="bg-gray-50 rounded-xl border border-dashed border-gray-200 p-8 text-center text-sm text-gray-500">
             Renseignez les dates de début et de fin pour générer le calendrier.
           </div>
         ) : (
@@ -413,7 +408,7 @@ export default function Parametres() {
                 {groups.map((group, gi) => (
                   <div key={group.label} className="flex items-center gap-1">
                     <div className={`flex flex-col items-center ${gi > 0 ? 'ml-2' : ''}`}>
-                      <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1 whitespace-nowrap capitalize">
+                      <span className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-1 whitespace-nowrap capitalize">
                         {group.label.replace(/\s\d{4}/, '')}
                       </span>
                       <div className="flex gap-1">
@@ -450,13 +445,11 @@ export default function Parametres() {
       {/* ── Forfaits ── */}
       <Section title="Forfaits">
         {loadingForfaits ? (
-          <div className="flex justify-center py-6">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-600" />
-          </div>
+          <LoadingSpinner />
         ) : (
           <>
             {forfaits.length === 0 ? (
-              <p className="text-sm text-gray-400 mb-4">Aucun forfait créé.</p>
+              <p className="text-sm text-gray-500 mb-4">Aucun forfait créé.</p>
             ) : (
               <div className="mb-4 rounded-xl border border-gray-100 overflow-hidden">
                 <table className="w-full text-sm">
@@ -475,13 +468,13 @@ export default function Parametres() {
                         <td className="px-4 py-3 font-medium text-gray-900">{f.libelle}</td>
                         <td className="px-4 py-3 text-gray-700">{Number(f.prix)} €</td>
                         <td className="px-4 py-3 text-gray-500">
-                          {f.nb_seances !== null ? `${f.nb_seances} séances` : <span className="italic text-gray-400">Annuel</span>}
+                          {f.nb_seances !== null ? `${f.nb_seances} séances` : <span className="italic text-gray-500">Annuel</span>}
                         </td>
                         <td className="px-4 py-3 text-gray-500">
                           {f.age_min !== null || f.age_max !== null
                             ? [f.age_min !== null ? `${f.age_min} ans` : null, f.age_max !== null ? `${f.age_max} ans` : null]
                                 .filter(Boolean).join(' – ')
-                            : <span className="text-gray-400">—</span>}
+                            : <span className="text-gray-500">—</span>}
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-2">
@@ -548,7 +541,7 @@ export default function Parametres() {
             </div>
           ))}
           {reglements.length === 0 && (
-            <p className="text-sm text-gray-400 italic">Aucun mode de règlement configuré.</p>
+            <p className="text-sm text-gray-500 italic">Aucun mode de règlement configuré.</p>
           )}
         </div>
         <div className="flex gap-2">
@@ -577,7 +570,7 @@ export default function Parametres() {
                 {editingForfait ? 'Modifier le forfait' : 'Nouveau forfait'}
               </h2>
               <button onClick={() => setShowForfaitForm(false)}
-                className="text-gray-400 hover:text-gray-600 text-2xl leading-none w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100">
+                className="text-gray-500 hover:text-gray-700 text-2xl leading-none w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100">
                 ×
               </button>
             </div>
@@ -606,7 +599,7 @@ export default function Parametres() {
               {/* Nombre de séances */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nombre de séances <span className="font-normal text-gray-400">(vide = annuel illimité)</span>
+                  Nombre de séances <span className="font-normal text-gray-500">(vide = annuel illimité)</span>
                 </label>
                 <input type="number" min="0" value={forfaitForm.nb_seances}
                   onChange={e => setForfaitForm(f => ({ ...f, nb_seances: e.target.value }))}
@@ -617,7 +610,7 @@ export default function Parametres() {
               {/* Tranche d'âge */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Tranche d'âge <span className="font-normal text-gray-400">(optionnel)</span>
+                  Tranche d'âge <span className="font-normal text-gray-500">(optionnel)</span>
                 </label>
                 <div className="grid grid-cols-2 gap-3">
                   <div>

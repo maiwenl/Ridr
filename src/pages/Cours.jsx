@@ -1,33 +1,30 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useCours } from '../hooks/useCours'
 import { supabase } from '../lib/supabase'
 import { GALOPS } from '../lib/calculs'
 import { useAuth } from '../contexts/AuthContext'
 import { useSaison } from '../contexts/SaisonContext'
+import { STATUTS } from '../lib/constants'
+import { inputCls } from '../lib/ui'
+import TrashIcon from '../components/TrashIcon'
+import LoadingSpinner from '../components/LoadingSpinner'
 
 const JOURS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi']
 const JOUR_ORDER = Object.fromEntries(JOURS.map((j, i) => [j, i]))
-
-const STATUTS = {
-  creation:        { label: 'En création',  cls: 'bg-gray-100 text-gray-600' },
-  pre_inscription: { label: 'Pré-inscrit',  cls: 'bg-amber-100 text-amber-700' },
-  complete:        { label: 'Inscrit',       cls: 'bg-green-100 text-green-700' },
-}
 
 const INIT_FORM = {
   nom: '', jour: '', heure_debut: '', heure_fin: '',
   niveaux: [], capacite: '', description: '', moniteur_id: '',
 }
 
-const inputCls = err =>
-  `w-full rounded-lg border ${err ? 'border-red-400' : 'border-gray-300'} px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent`
-
-function TrashIcon() {
+function SortIcon({ col, sortCol, sortDir }) {
+  const active = sortCol === col
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-    </svg>
+    <span className={`inline-flex flex-col ml-1.5 gap-[2px] ${active ? 'opacity-100' : 'opacity-30'}`}>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 6 4" className={`w-1.5 h-1 ${active && sortDir === 'asc' ? 'text-brand-600' : 'text-current'}`} fill="currentColor"><path d="M3 0 6 4H0z"/></svg>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 6 4" className={`w-1.5 h-1 ${active && sortDir === 'desc' ? 'text-brand-600' : 'text-current'}`} fill="currentColor"><path d="M3 4 0 0h6z"/></svg>
+    </span>
   )
 }
 
@@ -38,6 +35,11 @@ export default function Cours() {
 
   const { cours, loading, refetch } = useCours(saisonCourante?.id ?? null)
   const [moniteurs, setMoniteurs]   = useState([])
+
+  // ── Tri + filtre ───────────────────────────────────────────────────────────
+  const [sortCol, setSortCol]   = useState('jour')
+  const [sortDir, setSortDir]   = useState('asc')
+  const [filterJour, setFilterJour] = useState('')
 
   // ── Panneau fiche ──────────────────────────────────────────────────────────
   const [selectedCours, setSelectedCours] = useState(null)
@@ -178,62 +180,124 @@ export default function Cours() {
     refetch()
   }
 
-  // ── Tri ────────────────────────────────────────────────────────────────────
-  const coursTries = [...cours].sort((a, b) => {
-    const jDiff = (JOUR_ORDER[a.jour] ?? 99) - (JOUR_ORDER[b.jour] ?? 99)
-    return jDiff !== 0 ? jDiff : (a.heure_debut ?? '').localeCompare(b.heure_debut ?? '')
-  })
+  // ── Tri + filtre ───────────────────────────────────────────────────────────
+  function toggleSort(col) {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('asc') }
+  }
 
-  const th = 'px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap'
-  const td = 'px-4 py-3 text-sm text-gray-800'
+  const coursFiltres = useMemo(() => {
+    let list = filterJour ? cours.filter(c => c.jour === filterJour) : [...cours]
+    list.sort((a, b) => {
+      let va, vb
+      switch (sortCol) {
+        case 'jour': {
+          const jDiff = (JOUR_ORDER[a.jour] ?? 99) - (JOUR_ORDER[b.jour] ?? 99)
+          if (jDiff !== 0) return sortDir === 'asc' ? jDiff : -jDiff
+          va = a.heure_debut ?? ''; vb = b.heure_debut ?? ''; break
+        }
+        case 'nom':       va = a.nom ?? '';            vb = b.nom ?? '';            break
+        case 'moniteur':  va = a.moniteur?.prenom ?? ''; vb = b.moniteur?.prenom ?? ''; break
+        case 'places':    va = a.inscrits / (a.capacite || 1); vb = b.inscrits / (b.capacite || 1); break
+        default:          va = a[sortCol] ?? '';        vb = b[sortCol] ?? ''
+      }
+      if (va < vb) return sortDir === 'asc' ? -1 : 1
+      if (va > vb) return sortDir === 'asc' ? 1 : -1
+      return 0
+    })
+    return list
+  }, [cours, filterJour, sortCol, sortDir])
+
+  const thBase = 'px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none whitespace-nowrap transition-colors'
+  const thCls  = col => `${thBase} ${sortCol === col ? 'bg-brand-50 text-brand-700' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100'}`
+  const td = 'px-4 py-3.5 text-sm text-gray-800'
 
   return (
     <div className="p-6 md:p-8 flex gap-6 min-h-full">
 
       {/* ── Colonne principale ───────────────────────────────────────────── */}
       <div className={`flex-1 min-w-0 transition-all ${selectedCours ? 'hidden md:block' : ''}`}>
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Gestion des cours</h1>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Gestion des cours</h1>
+            {saisonCourante && <p className="text-sm text-gray-500 mt-0.5">Saison {saisonCourante.libelle}</p>}
+          </div>
           {isGerant && (
             <button
               onClick={openCreate}
-              className="bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+              className="inline-flex items-center gap-1.5 bg-brand-600 hover:bg-brand-700 active:scale-[0.98] text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-sm hover:shadow-md transition-all duration-150"
             >
-              + Nouveau cours
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              Nouveau cours
             </button>
           )}
         </div>
 
+        {/* Filtre jour */}
+        <div className="flex gap-2 mb-4 flex-wrap">
+          <button
+            onClick={() => setFilterJour('')}
+            className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors ${!filterJour ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}
+          >
+            Tous
+          </button>
+          {JOURS.filter(j => cours.some(c => c.jour === j)).map(j => (
+            <button
+              key={j}
+              onClick={() => setFilterJour(j === filterJour ? '' : j)}
+              className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors ${filterJour === j ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}
+            >
+              {j}
+            </button>
+          ))}
+        </div>
+
         {/* Tableau */}
-        <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
           {loading ? (
-            <div className="p-12 flex justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600" />
-            </div>
-          ) : coursTries.length === 0 ? (
-            <div className="p-12 text-center text-gray-400 text-sm">
-              Aucun cours créé. Cliquez sur "+ Nouveau cours" pour commencer.
+            <LoadingSpinner />
+          ) : coursFiltres.length === 0 ? (
+            <div className="py-16 flex flex-col items-center gap-3 text-center">
+              <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
+                </svg>
+              </div>
+              <p className="text-gray-700 font-medium text-sm">
+                {cours.length === 0 ? 'Aucun cours créé' : 'Aucun cours ce jour-là'}
+              </p>
+              {filterJour && <button onClick={() => setFilterJour('')} className="text-brand-600 hover:text-brand-800 text-xs font-medium">Voir tous les jours</button>}
             </div>
           ) : (
             <>
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-gray-50 border-b border-gray-100">
+                  <thead className="border-b border-gray-200">
                     <tr>
-                      <th className={th}>Jour</th>
-                      <th className={th}>Horaire</th>
-                      <th className={th}>Cours</th>
-                      <th className={th}>Niveaux</th>
-                      <th className={th}>Moniteur</th>
-                      <th className={th}>Places</th>
-                      <th className={th + ' text-right pr-6'}>Action</th>
+                      <th className={thCls('jour')}     onClick={() => toggleSort('jour')}>
+                        <span className="flex items-center">Jour <SortIcon col="jour" sortCol={sortCol} sortDir={sortDir} /></span>
+                      </th>
+                      <th className={`${thBase} text-gray-500 cursor-default hover:bg-transparent`}>Horaire</th>
+                      <th className={thCls('nom')}      onClick={() => toggleSort('nom')}>
+                        <span className="flex items-center">Cours <SortIcon col="nom" sortCol={sortCol} sortDir={sortDir} /></span>
+                      </th>
+                      <th className={`${thBase} text-gray-500 cursor-default hover:bg-transparent`}>Niveaux</th>
+                      <th className={thCls('moniteur')} onClick={() => toggleSort('moniteur')}>
+                        <span className="flex items-center">Moniteur <SortIcon col="moniteur" sortCol={sortCol} sortDir={sortDir} /></span>
+                      </th>
+                      <th className={thCls('places')}   onClick={() => toggleSort('places')}>
+                        <span className="flex items-center">Places <SortIcon col="places" sortCol={sortCol} sortDir={sortDir} /></span>
+                      </th>
+                      <th className={`${thBase} text-gray-500 cursor-default hover:bg-transparent text-right pr-5`}>Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {coursTries.map(c => {
-                      const pct     = Math.min(100, (c.inscrits / c.capacite) * 100)
-                      const complet = c.placesRestantes <= 0
-                      const quasi   = pct > 75 && !complet
+                  <tbody className="divide-y divide-gray-100">
+                    {coursFiltres.map(c => {
+                      const pct        = Math.min(100, (c.inscrits / c.capacite) * 100)
+                      const complet    = c.placesRestantes <= 0
+                      const quasi      = pct > 75 && !complet
                       const isSelected = selectedCours?.id === c.id
 
                       return (
@@ -244,20 +308,22 @@ export default function Cours() {
                         >
                           {/* Jour */}
                           <td className={td}>
-                            <span className="font-semibold text-brand-700">{c.jour}</span>
+                            <span className="inline-flex items-center text-xs font-bold text-brand-700 bg-brand-50 border border-brand-100 px-2 py-0.5 rounded-md">
+                              {c.jour}
+                            </span>
                           </td>
 
                           {/* Horaire */}
-                          <td className={td + ' text-gray-500 tabular-nums'}>
+                          <td className={`${td} text-gray-600 tabular-nums font-medium`}>
                             {c.heure_debut?.slice(0, 5)} – {c.heure_fin?.slice(0, 5)}
                           </td>
 
                           {/* Nom */}
                           <td className={td}>
                             <div className="flex items-center gap-2">
-                              <span className="font-medium">{c.nom}</span>
+                              <span className="font-semibold text-gray-900">{c.nom}</span>
                               {complet && (
-                                <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-medium">Complet</span>
+                                <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-semibold">Complet</span>
                               )}
                             </div>
                           </td>
@@ -267,45 +333,46 @@ export default function Cours() {
                             {c.niveaux?.length > 0 ? (
                               <div className="flex gap-1 flex-wrap">
                                 {c.niveaux.map(n => (
-                                  <span key={n} className="text-xs bg-brand-50 text-brand-700 border border-brand-100 px-1.5 py-0.5 rounded-full">
+                                  <span key={n} className="text-xs bg-brand-50 text-brand-700 border border-brand-100 px-1.5 py-0.5 rounded-full font-medium">
                                     {n}
                                   </span>
                                 ))}
                               </div>
                             ) : (
-                              <span className="text-gray-300">—</span>
+                              <span className="text-gray-500">—</span>
                             )}
                           </td>
 
                           {/* Moniteur */}
-                          <td className={td + ' text-gray-500'}>
-                            {c.moniteur ? `${c.moniteur.prenom}` : <span className="text-gray-300">—</span>}
+                          <td className={`${td} text-gray-600`}>
+                            {c.moniteur ? c.moniteur.prenom : <span className="text-gray-500">—</span>}
                           </td>
 
                           {/* Places */}
                           <td className={td}>
-                            <div className="flex items-center gap-2 min-w-[120px]">
-                              <div className="flex-1 bg-gray-200 rounded-full h-1.5">
+                            <div className="flex items-center gap-2 min-w-[110px]">
+                              <div className="flex-1 bg-gray-200 rounded-full h-1.5 min-w-[50px]">
                                 <div
-                                  className={`h-1.5 rounded-full transition-all ${
-                                    complet ? 'bg-red-500' : quasi ? 'bg-amber-400' : 'bg-brand-500'
-                                  }`}
+                                  className={`h-1.5 rounded-full transition-all ${complet ? 'bg-red-500' : quasi ? 'bg-amber-400' : 'bg-brand-500'}`}
                                   style={{ width: `${pct}%` }}
                                 />
                               </div>
-                              <span className="text-xs text-gray-500 shrink-0 tabular-nums">
+                              <span className={`text-xs font-medium tabular-nums shrink-0 ${complet ? 'text-red-600' : quasi ? 'text-amber-600' : 'text-gray-600'}`}>
                                 {c.inscrits}/{c.capacite}
                               </span>
                             </div>
                           </td>
 
                           {/* Action */}
-                          <td className={td + ' text-right pr-6'} onClick={e => e.stopPropagation()}>
+                          <td className={`${td} text-right pr-5`} onClick={e => e.stopPropagation()}>
                             <button
                               onClick={() => openFiche(c)}
-                              className="text-brand-600 hover:text-brand-800 text-xs font-medium"
+                              className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-white hover:bg-brand-600 px-2.5 py-1 rounded-lg border border-brand-200 hover:border-brand-600 transition-all duration-150"
                             >
-                              Voir →
+                              Voir
+                              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                              </svg>
                             </button>
                           </td>
                         </tr>
@@ -314,8 +381,16 @@ export default function Cours() {
                   </tbody>
                 </table>
               </div>
-              <div className="px-4 py-3 border-t border-gray-100 text-xs text-gray-400">
-                {coursTries.length} cours
+              <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
+                <p className="text-xs text-gray-500">
+                  <span className="font-semibold text-gray-700">{coursFiltres.length}</span> cours
+                  {filterJour && <span className="text-gray-500"> · {filterJour}</span>}
+                </p>
+                {filterJour && (
+                  <button onClick={() => setFilterJour('')} className="text-xs text-brand-600 hover:text-brand-800 font-medium">
+                    Tous les jours
+                  </button>
+                )}
               </div>
             </>
           )}
@@ -340,12 +415,12 @@ export default function Cours() {
                   ) : (
                     <span className="text-xs text-gray-500">{selectedCours.placesRestantes} place{selectedCours.placesRestantes > 1 ? 's' : ''} restante{selectedCours.placesRestantes > 1 ? 's' : ''}</span>
                   )}
-                  <span className="text-xs text-gray-400">{selectedCours.inscrits} inscrit{selectedCours.inscrits > 1 ? 's' : ''}</span>
+                  <span className="text-xs text-gray-500">{selectedCours.inscrits} inscrit{selectedCours.inscrits > 1 ? 's' : ''}</span>
                 </div>
               </div>
               <button
                 onClick={closeFiche}
-                className="text-gray-400 hover:text-gray-600 text-xl leading-none w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 shrink-0"
+                className="text-gray-500 hover:text-gray-700 text-xl leading-none w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 shrink-0"
               >
                 ×
               </button>
@@ -522,11 +597,9 @@ export default function Cours() {
               {ficheTab === 'eleves' && (
                 <div className="px-5 py-4">
                   {loadingEleves ? (
-                    <div className="flex justify-center py-8">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-600" />
-                    </div>
+                    <LoadingSpinner />
                   ) : eleves.length === 0 ? (
-                    <div className="text-center py-10 text-gray-400 text-sm">
+                    <div className="text-center py-10 text-gray-500 text-sm">
                       <p className="text-2xl mb-2">🐴</p>
                       Aucun élève inscrit à ce cours.
                     </div>
@@ -545,14 +618,14 @@ export default function Cours() {
                                 {e.adherent?.nom} <span className="font-normal">{e.adherent?.prenom}</span>
                               </p>
                               {e.adherent?.galop && (
-                                <p className="text-xs text-gray-400 mt-0.5">{e.adherent.galop}</p>
+                                <p className="text-xs text-gray-500 mt-0.5">{e.adherent.galop}</p>
                               )}
                             </div>
                             <div className="flex items-center gap-2 shrink-0 ml-3">
                               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statut.cls}`}>
                                 {statut.label}
                               </span>
-                              <span className="text-gray-300 group-hover:text-brand-500 text-xs transition-colors">→</span>
+                              <span className="text-gray-400 group-hover:text-brand-500 text-xs transition-colors">→</span>
                             </div>
                           </Link>
                         )
@@ -574,7 +647,7 @@ export default function Cours() {
               <h2 className="text-lg font-semibold text-gray-900">Nouveau cours</h2>
               <button
                 onClick={() => setShowCreate(false)}
-                className="text-gray-400 hover:text-gray-600 text-2xl leading-none w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100"
+                className="text-gray-500 hover:text-gray-700 text-2xl leading-none w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100"
               >
                 ×
               </button>
@@ -621,7 +694,7 @@ export default function Cours() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Niveaux concernés <span className="font-normal text-gray-400">(optionnel)</span></label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Niveaux concernés <span className="font-normal text-gray-500">(optionnel)</span></label>
                 <div className="flex flex-wrap gap-2">
                   {GALOPS.map(g => (
                     <button
@@ -653,7 +726,7 @@ export default function Cours() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description <span className="font-normal text-gray-400">(optionnel)</span></label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Description <span className="font-normal text-gray-500">(optionnel)</span></label>
                 <textarea
                   rows={2}
                   value={form.description}
@@ -664,7 +737,7 @@ export default function Cours() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Moniteur <span className="font-normal text-gray-400">(optionnel)</span></label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Moniteur <span className="font-normal text-gray-500">(optionnel)</span></label>
                 <select
                   value={form.moniteur_id}
                   onChange={e => setField('moniteur_id', e.target.value)}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useSaison } from '../contexts/SaisonContext'
+import LoadingSpinner from '../components/LoadingSpinner'
 
 const JOURS = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi']
 
@@ -130,7 +131,7 @@ export default function Pointage() {
     pointagesData?.forEach(p => {
       const isNormal = etudiantsByCours[p.cours_id]?.some(s => s.id === p.adherent_id)
       if (!isNormal) {
-        const adherent = allAdherentsData?.find(a => a.id === p.adherent_id)
+        const adherent = allMapped.find(a => a.id === p.adherent_id)
         if (adherent) rattByCours[p.cours_id].push(adherent)
       }
     })
@@ -264,14 +265,14 @@ export default function Pointage() {
 
       {/* ── Header sticky ── */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-100 shadow-sm px-4 py-3 md:static md:shadow-none md:border-0 md:bg-transparent md:px-8 md:pt-8 md:pb-0">
-        <div className="flex items-center justify-between gap-2 max-w-2xl mx-auto md:mx-0">
+        <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
             <h1 className="text-base font-bold text-gray-900 capitalize truncate md:text-2xl">
               <span className="md:hidden">{fmtDateMobile(date)}</span>
               <span className="hidden md:inline">{fmtDateDesktop(date)}</span>
             </h1>
             <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-              <span className="text-xs text-gray-400">S{weekNum}</span>
+              <span className="text-xs text-gray-500">S{weekNum}</span>
               {isToday && (
                 <span className="text-xs bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full font-medium">
                   Aujourd'hui
@@ -295,18 +296,16 @@ export default function Pointage() {
       </div>
 
       {/* ── Contenu ── */}
-      <div className="px-4 py-4 md:px-8 md:py-6 max-w-2xl mx-auto md:mx-0">
+      <div className="px-4 py-4 md:px-8 md:py-6">
         {loading ? (
-          <div className="flex justify-center py-20">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600" />
-          </div>
+          <LoadingSpinner />
         ) : coursJour.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-10 text-center mt-4">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-10 text-center mt-4 md:max-w-md">
             <p className="text-2xl mb-2">🐴</p>
-            <p className="text-gray-400 text-sm">{emptyMessage}</p>
+            <p className="text-gray-500 text-sm">{emptyMessage}</p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-4 md:space-y-0 md:grid md:grid-cols-[repeat(auto-fill,minmax(360px,1fr))] md:gap-5 md:items-start">
             {coursJour.map(cours => {
               const students     = etudiants[cours.id] ?? []
               const checked      = presences[cours.id] ?? new Set()
@@ -342,14 +341,14 @@ export default function Pointage() {
                         <p className="text-sm text-gray-500 mt-0.5">
                           {cours.heure_debut?.slice(0, 5)} – {cours.heure_fin?.slice(0, 5)}
                           {cours.niveaux?.length > 0 && (
-                            <span className="text-gray-400"> · {cours.niveaux.join(', ')}</span>
+                            <span className="text-gray-500"> · {cours.niveaux.join(', ')}</span>
                           )}
                         </p>
                       </div>
                       <div className="shrink-0 text-right">
                         <div>
                           <span className={`text-2xl font-black ${counterColor}`}>{nbChecked}</span>
-                          <span className="text-gray-400 text-base font-semibold">/{students.length}</span>
+                          <span className="text-gray-500 text-base font-semibold">/{students.length}</span>
                         </div>
                         {nbRatt > 0 && (
                           <span className="text-xs text-violet-600 font-medium">
@@ -369,7 +368,7 @@ export default function Pointage() {
                       >
                         {allCkd ? 'Tout décocher' : 'Tout cocher'}
                       </button>
-                      <span className="text-xs text-gray-400">
+                      <span className="text-xs text-gray-500">
                         {students.length} élève{students.length > 1 ? 's' : ''}
                       </span>
                     </div>
@@ -377,7 +376,7 @@ export default function Pointage() {
 
                   {/* Liste élèves réguliers */}
                   {students.length === 0 ? (
-                    <p className="px-4 py-4 text-sm text-gray-400 text-center">
+                    <p className="px-4 py-4 text-sm text-gray-500 text-center">
                       Aucun élève inscrit à ce cours.
                     </p>
                   ) : (
@@ -395,11 +394,11 @@ export default function Pointage() {
                               onChange={() => toggleStudent(cours.id, s.id)}
                               className="w-6 h-6 rounded-md border-2 border-gray-300 text-brand-600 focus:ring-brand-500 cursor-pointer shrink-0 accent-brand-600"
                             />
-                            <span className={`flex-1 text-base font-medium leading-tight ${isPresent ? 'text-gray-900' : 'text-gray-400 line-through'}`}>
+                            <span className={`flex-1 text-base font-medium leading-tight ${isPresent ? 'text-gray-900' : 'text-gray-500 line-through'}`}>
                               {s.prenom} {s.nom}
                             </span>
                             {s.forfait?.nb_seances && (
-                              <span className="text-xs text-gray-400 shrink-0 bg-gray-100 px-2 py-0.5 rounded-full">
+                              <span className="text-xs text-gray-600 shrink-0 bg-gray-100 px-2 py-0.5 rounded-full">
                                 {s.forfait.libelle}
                               </span>
                             )}
@@ -429,14 +428,14 @@ export default function Pointage() {
                                 {r.prenom} {r.nom}
                               </span>
                               {r.forfait?.nb_seances && (
-                                <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full shrink-0">
+                                <span className="text-xs text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full shrink-0">
                                   {r.forfait.libelle}
                                 </span>
                               )}
                               <button
                                 onClick={() => removeRattrapage(cours.id, r.id)}
                                 title="Retirer le rattrapage"
-                                className="text-gray-300 hover:text-red-400 transition-colors shrink-0 text-lg leading-none"
+                                className="text-gray-400 hover:text-red-400 transition-colors shrink-0 text-lg leading-none"
                               >
                                 ×
                               </button>
@@ -468,7 +467,7 @@ export default function Pointage() {
                       {isDropOpen && (
                         <div className="absolute left-4 right-4 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-20 overflow-hidden">
                           {results.length === 0 ? (
-                            <p className="px-4 py-3 text-sm text-gray-400 text-center">
+                            <p className="px-4 py-3 text-sm text-gray-500 text-center">
                               Aucun résultat pour « {searchQuery} »
                             </p>
                           ) : (
@@ -488,7 +487,7 @@ export default function Pointage() {
                                     {a.prenom} {a.nom}
                                   </p>
                                   {a.forfait?.libelle && (
-                                    <p className="text-xs text-gray-400 truncate">{a.forfait.libelle}</p>
+                                    <p className="text-xs text-gray-500 truncate">{a.forfait.libelle}</p>
                                   )}
                                 </div>
                                 <span className="text-xs text-brand-600 font-semibold shrink-0">+ Ajouter</span>
