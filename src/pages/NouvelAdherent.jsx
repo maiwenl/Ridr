@@ -5,8 +5,10 @@ import { useForfaits } from '../hooks/useForfaits'
 import { useCours } from '../hooks/useCours'
 import { useParametres } from '../hooks/useParametres'
 import { calculateAge, computeFinancial } from '../lib/calculs'
+import { flattenLignesPaiement } from './inscription/PaiementBuilder'
 import { supabase } from '../lib/supabase'
 import { useSaison } from '../contexts/SaisonContext'
+import { useAuth } from '../contexts/AuthContext'
 import Step1Cavalier from './inscription/Step1Cavalier'
 import Step2Responsables from './inscription/Step2Responsables'
 import Step3ForFait from './inscription/Step3ForFait'
@@ -15,11 +17,12 @@ import Step4Recap from './inscription/Step4Recap'
 const INIT_FORM = {
   nom: '', prenom: '', date_naissance: '', email: '', telephone: '', adresse: '',
   galop: '', droit_image: false,
-  responsable1: { nom_prenom: '', telephone: '', adresse: '', meme_adresse: false },
+  responsable1: { nom_prenom: '', telephone: '', email: '', adresse: '', meme_adresse: false },
   responsable2: null,
-  cours_id: '', forfait_id: '', forfait2_id: '',
-  remise_famille: false, remise_famille_nom: '',
-  mode_paiement: '1_fois', mode_reglement: '',
+  type_inscription: 'cours_annuel',
+  activite_id: '', offre_id: '', offre2_id: '',
+  remise_montant: '', motif_remise: '',
+  lignes_paiement: null,
 }
 
 const STEP_META = {
@@ -31,10 +34,11 @@ const STEP_META = {
 
 export default function NouvelAdherent() {
   const navigate = useNavigate()
+  const { clubId } = useAuth()
   const { saisonCourante } = useSaison()
-  const { forfaits, loading: loadingF } = useForfaits()
+  const { forfaits, loading: loadingF } = useForfaits(saisonCourante?.id ?? null)
   const { cours, loading: loadingC }   = useCours(saisonCourante?.id ?? null)
-  const { parametres, modesReglement, loading: loadingP } = useParametres()
+  const { parametres, modesReglement, nbFoisAcceptes, loading: loadingP } = useParametres(saisonCourante?.id ?? null)
 
   const [step, setStep]         = useState(1)
   const [formData, setFormData] = useState(INIT_FORM)
@@ -45,11 +49,29 @@ export default function NouvelAdherent() {
   const age     = calculateAge(formData.date_naissance)
   const isMinor = age !== null && age < 18
 
+  // Calcul financier (utilisé pour PaiementBuilder et validation)
+  const isStageForm  = formData.type_inscription !== 'cours_annuel'
+  const forfait1Form = isStageForm ? null : (forfaits.find(f => f.id === formData.offre_id) ?? null)
+  const forfait2Form = isStageForm ? null : (formData.offre2_id ? forfaits.find(f => f.id === formData.offre2_id) ?? null : null)
+  const remiseMontantForm = Number(formData.remise_montant) || 0
+  const financial = (forfait1Form || isStageForm)
+    ? (isStageForm
+        ? computeFinancial({ prixBase: 0, remiseMontant: remiseMontantForm, age, parametres })
+        : computeFinancial({ forfait1: forfait1Form, forfait2: forfait2Form, remiseMontant: remiseMontantForm, age, parametres }))
+    : null
+
   const visibleSteps = isMinor ? [1, 2, 3, 4] : [1, 3, 4]
   const currentIdx   = visibleSteps.indexOf(step)
 
   function setField(name, value) {
-    setFormData(prev => ({ ...prev, [name]: value }))
+    setFormData(prev => {
+      const next = { ...prev, [name]: value }
+      // Réinitialise le plan de paiement si le forfait ou la remise change
+      if (['offre_id', 'offre2_id', 'remise_montant', 'activite_id', 'type_inscription'].includes(name)) {
+        next.lignes_paiement = null
+      }
+      return next
+    })
     setErrors(prev => { const next = { ...prev }; delete next[name]; return next })
   }
 
@@ -67,12 +89,36 @@ export default function NouvelAdherent() {
     if (s === 2) {
       if (!formData.responsable1.nom_prenom.trim()) e.rl1_nom_prenom = 'Requis'
       if (!formData.responsable1.telephone.trim())  e.rl1_telephone  = 'Requis'
+      if (!formData.responsable1.email?.trim())     e.rl1_email      = 'Requis'
       if (!formData.responsable1.meme_adresse && !formData.responsable1.adresse.trim()) e.rl1_adresse = 'Requis'
+      if (formData.responsable2) {
+        if (!formData.responsable2.nom_prenom.trim()) e.rl2_nom_prenom = 'Requis'
+        if (!formData.responsable2.telephone.trim())  e.rl2_telephone  = 'Requis'
+        if (!formData.responsable2.email?.trim())     e.rl2_email      = 'Requis'
+        if (!formData.responsable2.meme_adresse && !formData.responsable2.adresse.trim()) e.rl2_adresse = 'Requis'
+      }
     }
     if (s === 3) {
-      if (!formData.cours_id)        e.cours_id        = 'Sélectionnez un cours'
-      if (!formData.forfait_id)      e.forfait_id      = 'Sélectionnez un forfait'
-      if (!formData.mode_reglement)  e.mode_reglement  = 'Sélectionnez un mode de règlement'
+      if (!formData.activite_id) e.activite_id = 'Sélectionnez une activité'
+      if (formData.type_inscription === 'cours_annuel' && !formData.offre_id)
+        e.offre_id = 'Sélectionnez un forfait'
+      // Validation du plan de paiement (section par section, sans croisement)
+      if (financial && formData.lignes_paiement) {
+        const lp      = formData.lignes_paiement
+        const licM    = financial.licenceMontant  ?? 0
+        const forM    = financial.totalForfait    ?? 0
+        const acompteM = financial.acompteMontant ?? 0
+        if (licM > 0 && !lp.licence?.mode_reglement)
+          e.paiement_licence = 'Sélectionnez un mode de règlement pour la licence'
+        if (acompteM > 0 && !lp.acompte?.mode_reglement)
+          e.paiement_acompte = 'Sélectionnez un mode de règlement pour l\'acompte'
+        if (forM > 0) {
+          ;(lp.forfait ?? []).forEach((ligne, idx) => {
+            if (!ligne.mode_reglement)
+              e[`paiement_forfait_${idx}`] = 'Sélectionnez un mode de règlement'
+          })
+        }
+      }
     }
     return e
   }
@@ -92,46 +138,69 @@ export default function NouvelAdherent() {
     setSubmitting(true)
     setSubmitError('')
 
-    const forfait1 = forfaits.find(f => f.id === formData.forfait_id)  ?? null
-    const forfait2 = formData.forfait2_id ? forfaits.find(f => f.id === formData.forfait2_id) ?? null : null
-    const { total } = computeFinancial({ forfait1, forfait2, remiseFamille: formData.remise_famille, age, parametres })
+    const isStage       = formData.type_inscription !== 'cours_annuel'
+    const forfait1      = isStage ? null : (forfaits.find(f => f.id === formData.offre_id) ?? null)
+    const forfait2      = isStage ? null : (formData.offre2_id ? forfaits.find(f => f.id === formData.offre2_id) ?? null : null)
+    const remiseMontant = Number(formData.remise_montant) || 0
+    const { total, licenceMontant, acompteMontant } = isStage
+      ? computeFinancial({ prixBase: 0, remiseMontant, age, parametres })
+      : computeFinancial({ forfait1, forfait2, remiseMontant, age, parametres })
 
     // 1. Créer l'adhérent (données personnelles uniquement)
     const { data: adherent, error: err1 } = await supabase
-      .from('adherents')
+      .from('members')
       .insert({
-        nom:            formData.nom.trim(),
-        prenom:         formData.prenom.trim(),
-        email:          formData.email.trim(),
-        telephone:      formData.telephone.trim(),
-        adresse:        formData.adresse.trim(),
-        date_naissance: formData.date_naissance,
-        galop:          formData.galop,
-        droit_image:    formData.droit_image,
+        club_id:    clubId,
+        last_name:  formData.nom.trim(),
+        first_name: formData.prenom.trim(),
+        email:      formData.email.trim(),
+        phone:      formData.telephone.trim(),
+        address:    formData.adresse.trim(),
+        birth_date: formData.date_naissance,
+        galop:      formData.galop,
+        droit_image: formData.droit_image,
       })
       .select()
       .single()
 
     if (err1) { setSubmitError(err1.message); setSubmitting(false); return }
 
-    // 2. Créer l'adhésion (données saison)
-    const { error: err2 } = await supabase
-      .from('adhesions')
+    // 2. Créer l'inscription (données saison)
+    const { data: inscription, error: err2 } = await supabase
+      .from('enrollments')
       .insert({
-        adherent_id:        adherent.id,
-        saison_id:          saisonCourante?.id ?? null,
-        cours_id:           formData.cours_id   || null,
-        forfait_id:         formData.forfait_id  || null,
-        forfait2_id:        formData.forfait2_id || null,
-        remise_famille:     formData.remise_famille,
-        remise_famille_nom: formData.remise_famille_nom || null,
-        mode_paiement:      formData.mode_paiement,
-        mode_reglement:     formData.mode_reglement,
-        montant_total:      total,
-        statut:             'creation',
+        club_id:              clubId,
+        member_id:            adherent.id,
+        season_id:            saisonCourante?.id ?? null,
+        type:                 formData.type_inscription,
+        activity_id:          formData.activite_id  || null,
+        plan_id:              isStage ? null : (formData.offre_id  || null),
+        plan2_id:             isStage ? null : (formData.offre2_id || null),
+        discount_amount:      remiseMontant,
+        discount_reason:      formData.motif_remise.trim() || null,
+        total_amount:         total,
+        status:               'pre_inscription',
+        reglement_accepte:    true,
+        reglement_accepte_at: new Date().toISOString(),
       })
+      .select()
+      .single()
 
     if (err2) { setSubmitError(err2.message); setSubmitting(false); return }
+
+    // 2b. Paiements prévus (plan de paiement)
+    if (inscription?.id && formData.lignes_paiement) {
+      const rows = flattenLignesPaiement(formData.lignes_paiement, inscription.id, licenceMontant, acompteMontant)
+      if (rows.length > 0) {
+        const { error: errP } = await supabase.from('payments').insert(rows.map(r => ({
+          ...r,
+          club_id:       clubId,
+          enrollment_id: inscription.id,
+          inscription_id: undefined,  // champ legacy supprimé
+        })))
+        if (errP) { setSubmitError(errP.message); setSubmitting(false); return }
+      }
+    }
 
     // 3. Responsables légaux si mineur
     if (isMinor) {
@@ -139,14 +208,16 @@ export default function NouvelAdherent() {
         { ...formData.responsable1, rang: 1 },
         ...(formData.responsable2 ? [{ ...formData.responsable2, rang: 2 }] : []),
       ].map(r => ({
-        adherent_id:  adherent.id,
+        club_id:      clubId,
+        member_id:    adherent.id,
         rang:         r.rang,
-        nom_prenom:   r.nom_prenom.trim(),
-        telephone:    r.telephone.trim(),
-        adresse:      r.meme_adresse ? null : (r.adresse?.trim() || null),
+        full_name:    r.nom_prenom.trim(),
+        phone:        r.telephone.trim(),
+        email:        r.email?.trim() || null,
+        address:      r.meme_adresse ? null : (r.adresse?.trim() || null),
         meme_adresse: r.meme_adresse,
       }))
-      const { error: err3 } = await supabase.from('responsables').insert(responsables)
+      const { error: err3 } = await supabase.from('guardians').insert(responsables)
       if (err3) { setSubmitError(err3.message); setSubmitting(false); return }
     }
 
@@ -159,7 +230,7 @@ export default function NouvelAdherent() {
     <div className="p-8 max-w-4xl">
       <h1 className="text-2xl font-bold text-gray-900 mb-1">Nouvelle inscription</h1>
       {saisonCourante && (
-        <p className="text-sm text-gray-500 mb-6">Saison {saisonCourante.libelle}</p>
+        <p className="text-sm text-gray-500 mb-6">Saison {saisonCourante.name ?? saisonCourante.libelle}</p>
       )}
 
       {/* Stepper */}
@@ -203,13 +274,16 @@ export default function NouvelAdherent() {
         {step === 3 && (
           <Step3ForFait
             data={formData} onChange={setField} errors={errors}
-            cours={cours} forfaits={forfaits} parametres={parametres}
+            activites={cours} forfaits={forfaits} parametres={parametres}
             dateNaissance={formData.date_naissance} modesReglement={modesReglement}
+            nbFoisAcceptes={nbFoisAcceptes}
+            saison={saisonCourante}
+            financial={financial}
           />
         )}
         {step === 4 && (
           <Step4Recap
-            formData={formData} forfaits={forfaits} cours={cours}
+            formData={formData} forfaits={forfaits} activites={cours}
             parametres={parametres} onSubmit={handleSubmit} loading={submitting}
           />
         )}
