@@ -331,11 +331,17 @@ export default function InscriptionPublique() {
         if (inscription?.id && formData.lignes_paiement) {
             const rows = flattenLignesPaiement(formData.lignes_paiement, inscription.id, licenceMontant, acompteMontant)
             if (rows.length > 0) {
-                await supabase.from('payments').insert(rows.map(r => ({
+                const {error: errP} = await supabase.from('payments').insert(rows.map(r => ({
                     ...r,
                     club_id: clubId,
                     enrollment_id: inscription.id,
                 })))
+                if (errP) {
+                    setErrors({_global: `Erreur lors de l'enregistrement du plan de paiement : ${errP.message}`})
+                    window.scrollTo(0, 0)
+                    setSubmitting(false)
+                    return
+                }
             }
         }
 

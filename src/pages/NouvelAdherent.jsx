@@ -103,6 +103,8 @@ export default function NouvelAdherent() {
       if (formData.type_inscription === 'cours_annuel' && !formData.offre_id)
         e.offre_id = 'Sélectionnez un forfait'
       // Validation du plan de paiement (section par section, sans croisement)
+      if (financial && !formData.lignes_paiement)
+        e.paiement_licence = 'Le plan de paiement n\'a pas encore été initialisé, veuillez patienter'
       if (financial && formData.lignes_paiement) {
         const lp      = formData.lignes_paiement
         const licM    = financial.licenceMontant  ?? 0
